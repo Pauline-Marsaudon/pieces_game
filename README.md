@@ -16,12 +16,12 @@ Here is the limk : https://pauline-marsaudon.github.io/pieces_game/
 ## Installation
 ### Clone the repository:
 ```bash
-git clone https://github.com/Francois-lqc/brain_vrar.git
+git clone git@github.com:Pauline-Marsaudon/pieces_game.git
 ```
 
 ### Navigate to the project folder:
 ```bash
-cd brain_vrar
+cd pieces_game
 ```
 
 ### Install dependencies
