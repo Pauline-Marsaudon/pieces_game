@@ -3,7 +3,7 @@
 An interactive tool developed with [Three.js](https://threejs.org/) for learning and exploring different areas of the human brain in 3D. This project allows users not only to visualize brain regions but also to stimulate each area in their own brain (not complete for now).
 
 ## Link to test the application in live
-Here is the limk : https://francois-lqc.github.io/brain_vrar/
+Here is the limk : https://pauline-marsaudon.github.io/pieces_game/
 
 ## Features
 - **Interactive 3D Exploration:** Navigate and explore a detailed 3D brain model.
