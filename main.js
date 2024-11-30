@@ -1,11 +1,10 @@
 "use strict";
 
+// Import only what you need, to help your bundler optimize final code size using tree shaking
+// see https://developer.mozilla.org/en-US/docs/Glossary/Tree_shaking)
+
 import {
   AmbientLight,
-  Audio,
-  AudioLoader,
-  AudioListener,
-  Clock,
   Group,
   HemisphereLight,
   LoadingManager,
@@ -15,6 +14,7 @@ import {
   Raycaster,
   RingGeometry,
   Scene,
+  Vector2,
   WebGLRenderer
 } from 'three';
 
@@ -25,22 +25,25 @@ import { XRDevice, metaQuest3 } from 'iwer';
 // XR
 import { XRButton } from 'three/addons/webxr/XRButton.js';
 
-import {
-  OrbitControls
-} from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-import {
-  GLTFLoader
-} from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { XRControllerModelFactory } from 'three/examples/jsm/Addons.js';
 
+// Example of hard link to official repo for data, if needed
+// const MODEL_PATH = 'https://raw.githubusercontent.com/mrdoob/js/r148/examples/models/gltf/LeePerrySmith/LeePerrySmith.glb';
 
-import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
+function RandomValue(min, max) {
+  return Math.floor(Math.random() * (max - min) + min);
+}
 
 let reticle;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
-let objectScaled;
-let info, infomesh;
+let coins = [];
+let draggableObject = null;
+const touchPosition = new Vector2();
+
 
 async function setupXR(xrMode) {
 
@@ -79,10 +82,8 @@ async function setupXR(xrMode) {
 await setupXR('immersive-ar');
 
 let camera, scene, renderer;
-let controller, group, raycaster;
-
-const clock = new Clock();
-let brain_rotate = true;
+let controller, controller2, controllerGrip1, controllerGrip2, group, raycaster;
+const intersected = [];
 
 // Main loop
 const animate = (timestamp, frame) => {
@@ -90,14 +91,6 @@ const animate = (timestamp, frame) => {
   if (frame) {
     const referenceSpace = renderer.xr.getReferenceSpace();
     const session = renderer.xr.getSession();
-    let elapsed = clock.getElapsedTime();
-
-    if (!brain_rotate)
-      elapsed = clock.oldTime;
-    if (brain_rotate && brain_obj) {
-      brain_obj.rotation.y = elapsed / 2;
-      elapsed = clock.getElapsedTime();
-    }
 
     if (hitTestSourceRequested === false) {
       session.requestReferenceSpace('viewer').then(function (referenceSpace) {
@@ -157,16 +150,6 @@ const init = () => {
   xrButton.style.backgroundColor = 'blue';
   document.body.appendChild(xrButton);
 
-  var audioLoader = new AudioLoader();
-  var listener = new AudioListener();
-  var backgroundAudio = new Audio(listener);
-  audioLoader.load("assets/audios/background_sound.mp3", function (buffer) {
-    backgroundAudio.setBuffer(buffer);
-    backgroundAudio.setLoop(true);
-    backgroundAudio.setVolume(1);
-    backgroundAudio.play();
-  });
-
   const controls = new OrbitControls(camera, renderer.domElement);
   //controls.listenToKeyEvents(window); // optional
   controls.target.set(0, 1.6, 0);
@@ -188,15 +171,19 @@ const init = () => {
 
     if (reticle.visible) {
 
+
       if (isCerveauSpawn == false) {
-        brain_obj = loader.load('big_brain.glb', gltfReader);
+        loader.load('empty_box.glb', gltfReader);
         isCerveauSpawn = true;
+        loader.load('coin.glb', gltfCoinReader);
+        return;
       }
-      let targetObject = null;
+
+
       const controller = event.target;
 
-      // fonction qui me récupère tous les objets sur lesquels j'ai cliqué
-      const intersections = getIntersections(controller);
+      raycaster.setFromXRController(controller);
+      const intersections = raycaster.intersectObjects(coins);
 
       console.log(intersections);
       if (intersections.length > 0) {
@@ -205,44 +192,31 @@ const init = () => {
         const intersection = intersections[0];
 
         const object = intersection.object;
+        // object.material.emissive.r = 1;
+        // controller.attach(object);
 
         controller.userData.selected = object;
-        targetObject = object.parent;
-        console.log('J\'ai intercepté un object ' + targetObject.name);
-      }
-      if (targetObject) {
-        if (objectScaled != null) {
-          // To revert back scaled object
-          objectScaled.scale.set(objectScaled.scale.x - 0.1, objectScaled.scale.y - 0.1, objectScaled.scale.z - 0.1);
-          infomesh.visible = false;
-          objectScaled = null;
-        }
-        info = document.getElementById(targetObject.name);
-        infomesh = new HTMLMesh(info);
-        infomesh.position.set(brain_obj.position.x + 1, brain_obj.position.y + 1, brain_obj.position.z + 1);
-        scene.add(infomesh);
-
-        brain_rotate = false;
-
-        // Make object 10% bigger
-        targetObject.scale.set(targetObject.scale.x + 0.1, targetObject.scale.y + 0.1, targetObject.scale.z + 0.1)
-        objectScaled = targetObject;
+        console.log('J\'ai intercepté un object ' + object.name);
+        draggableObject = object;
       }
       else {
-        if (objectScaled != null) {
-          objectScaled.scale.set(objectScaled.scale.x - 0.1, objectScaled.scale.y - 0.1, objectScaled.scale.z - 0.1);
-          objectScaled = null;
-          infomesh.visible = false;
-        }
-        brain_rotate = true;
+        console.log('Aucun object intercepté');
+        draggableObject = null;
       }
-      controller.userData.targetRayMode = event.data.targetRayMode;
-
     }
+    controller.userData.targetRayMode = event.data.targetRayMode;
   }
 
   controller = renderer.xr.getController(0);
   controller.addEventListener('select', onSelect);
+  controller.addEventListener('selectstart', onTouchStart);
+  controller.addEventListener('selectend', onTouchMove);
+  const controllerModelFactory = new XRControllerModelFactory();
+
+  controllerGrip1 = renderer.xr.getControllerGrip(0);
+  controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+  scene.add(controllerGrip1);
+
   scene.add(controller);
   group = new Group();
   scene.add(group);
@@ -261,23 +235,41 @@ const init = () => {
 
 }
 
-init()
+init();
 
-let brain_obj;
 function gltfReader(gltf) {
-  brain_obj = gltf.scene;
+  let brain_obj = gltf.scene;
 
   if (brain_obj != null) {
     console.log("Model loaded:  " + brain_obj);
     brain_obj.scale.set(0.1, 0.1, 0.1);
     reticle.matrix.decompose(brain_obj.position, brain_obj.quaternion, brain_obj.scale)
     group.add(brain_obj);
-    console.log(brain_obj);
-    return brain_obj;
   } else {
     console.log("Load FAILED.  ");
   }
 
+}
+
+function gltfCoinReader(gltf) {
+  let testModel = null;
+
+  testModel = gltf.scene;
+
+  if (testModel != null) {
+    console.log("Model loaded:  " + testModel);
+    for (let i = 1; i <= 3; i++) {
+      const clone = gltf.scene.clone();
+      clone.position.set(RandomValue(-2, 2), 1, RandomValue(-2, 2));
+      clone.name = "Coin_" + i;
+      scene.add(clone); // Add the wrapper to the scene
+      group.add(clone); // Add the wrapper to the scene
+      coins.push(clone); // Store the wrapper instead of the clone
+    }
+
+  } else {
+    console.log("Load FAILED.  ");
+  }
 }
 
 function getIntersections(controller) {
@@ -286,13 +278,39 @@ function getIntersections(controller) {
 
   raycaster.setFromXRController(controller);
 
-  return raycaster.intersectObjects(group.children, true);
+  return raycaster.intersectObjects(group.children, false);
 
 }
 
+function onTouchStart(event) {
+  console.log('Touch start');
+  const c = event.target;
+  const intersections = getIntersections(c);
+
+  if (intersections.length > 0) {
+    const intersection = intersections[0];
+    const object = intersection.object;
+    c.attach(object);
+    c.userData.selected = object;
+  }
+  c.userData.targetRayMode = event.data.targetRayMode;
+}
+
+function onTouchMove(event) {
+  console.log('Touch end');
+  const c = event.target;
+  if (c.userData.selected !== undefined) {
+    const object = c.userData.selected;
+    group.attach(object);
+    c.userData.selected = undefined;
+  }
+}
+
 function onWindowResize() {
+
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
   renderer.setSize(window.innerWidth, window.innerHeight);
+
 }
