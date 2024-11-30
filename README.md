@@ -16,7 +16,7 @@ Here is the limk : https://pauline-marsaudon.github.io/pieces_game/
 ## Installation
 ### Clone the repository:
 ```bash
-git clone git@github.com:Pauline-Marsaudon/pieces_game.git
+git clone https://github.com/Pauline-Marsaudon/pieces_game
 ```
 
 ### Navigate to the project folder:
