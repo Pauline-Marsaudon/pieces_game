@@ -1,0 +1,36 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+div {
+  font-size: larger;
+}
+
+.Frontal_Lobe {
+  position: relative;
+  height: fit-content;
+  display: none;
+}
+
+.Parietal_Lobe {
+  position: relative;
+  height: fit-content;
+  display: none;
+
+}
+
+.Temporal_Lobe {
+  position: relative;
+  height: fit-content;
+  display: none;
+
+}
+
+.Occipital_Lobe {
+  position: relative;
+  height: fit-content;
+  display: none;
+}
